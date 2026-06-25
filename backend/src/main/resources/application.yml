@@ -1,0 +1,48 @@
+server:
+  port: 8080
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: cantor-journal
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:cantor}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+    username: ${DB_USER:cantor}
+    password: ${DB_PASSWORD:cantor}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    # 컨트롤러에서 LAZY 연관관계를 DTO로 매핑하므로 영속성 컨텍스트를 뷰까지 유지한다.
+    # (대규모 트래픽에서는 fetch join / EntityGraph 로 전환 권장)
+    open-in-view: true
+    properties:
+      hibernate:
+        format_sql: false
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-this-needs-to-be-at-least-32-bytes-long}
+    expiration-ms: ${JWT_EXPIRATION:86400000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost,http://localhost:80,http://localhost:5173}
+  storage:
+    upload-dir: ${UPLOAD_DIR:/app/uploads}
+  review:
+    double-blind: ${REVIEW_DOUBLE_BLIND:true}
+  seed:
+    editor-email: ${SEED_EDITOR_EMAIL:editor@cantor.org}
+    editor-password: ${SEED_EDITOR_PASSWORD:editor1234}
+  # 이메일 알림(선택). 기본 비활성 — 인앱 알림은 항상 동작한다.
+  # 사용하려면 MAIL_ENABLED=true 와 표준 spring.mail.* (MAIL_HOST 등)을 설정.
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:no-reply@cantor.org}
+
+logging:
+  level:
+    org.springframework.security: INFO

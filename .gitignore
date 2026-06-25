@@ -1,2 +1,23 @@
+# Agda
 *.agdai
 MAlonzo/**
+
+# Env / secrets
+.env
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# Java / backend
+backend/.gradle/
+backend/build/
+*.class
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

@@ -1,0 +1,13 @@
+.git
+.gitignore
+**/node_modules
+frontend/dist
+frontend/.vite
+backend/.gradle
+backend/build
+**/*.iml
+.idea
+.vscode
+.DS_Store
+.env
+*.md

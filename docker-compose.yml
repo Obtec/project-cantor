@@ -1,0 +1,76 @@
+name: cantor-journal
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-cantor}
+      MYSQL_USER: ${DB_USER:-cantor}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-cantor}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    # 빌드 컨텍스트는 루트(.): 프론트엔드를 빌드해 백엔드 jar의 정적 리소스로 포함한다.
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-cantor}
+      DB_USER: ${DB_USER:-cantor}
+      DB_PASSWORD: ${DB_PASSWORD:-cantor}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-this-needs-to-be-at-least-32-bytes-long}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://localhost:5173}
+      UPLOAD_DIR: /app/uploads
+      SEED_EDITOR_EMAIL: ${SEED_EDITOR_EMAIL:-editor@cantor.org}
+      SEED_EDITOR_PASSWORD: ${SEED_EDITOR_PASSWORD:-editor1234}
+      REVIEW_DOUBLE_BLIND: ${REVIEW_DOUBLE_BLIND:-true}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@cantor.org}
+    volumes:
+      - uploads:/app/uploads
+
+  # 프론트엔드는 backend 이미지에 빌드되어 함께 서빙된다(별도 서비스 없음).
+
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    depends_on:
+      - backend
+
+  # 인증서 자동 갱신 루프. 최초 발급은 nginx/init-letsencrypt.sh 로 수행한다.
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done'
+
+volumes:
+  db_data:
+  uploads:
+  certbot_conf:
+  certbot_www:
