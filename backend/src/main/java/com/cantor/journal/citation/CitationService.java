@@ -6,6 +6,7 @@ import com.cantor.journal.citation.dto.CitationDtos.PaperNode;
 import com.cantor.journal.common.ApiException;
 import com.cantor.journal.paper.Paper;
 import com.cantor.journal.paper.PaperRepository;
+import com.cantor.journal.paper.PaperStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,15 +95,19 @@ public class CitationService {
             if (d >= MAX_DEPTH) {
                 continue;
             }
-            // outgoing: current 가 인용한 논문들
+            // outgoing: current 가 인용한 논문들 (게재된 논문만 노출)
             for (Citation c : citationRepository.findByCitingPaperId(current)) {
-                addEdge(edges, edgeKeys, current, c.getCitedPaper().getId());
-                visit(c.getCitedPaper(), nodePapers, depth, queue, d + 1);
+                Paper cited = c.getCitedPaper();
+                if (cited.getStatus() != PaperStatus.PUBLISHED) continue;
+                addEdge(edges, edgeKeys, current, cited.getId());
+                visit(cited, nodePapers, depth, queue, d + 1);
             }
-            // incoming: current 를 인용한 논문들
+            // incoming: current 를 인용한 논문들 (게재된 논문만 노출)
             for (Citation c : citationRepository.findByCitedPaperId(current)) {
-                addEdge(edges, edgeKeys, c.getCitingPaper().getId(), current);
-                visit(c.getCitingPaper(), nodePapers, depth, queue, d + 1);
+                Paper citing = c.getCitingPaper();
+                if (citing.getStatus() != PaperStatus.PUBLISHED) continue;
+                addEdge(edges, edgeKeys, citing.getId(), current);
+                visit(citing, nodePapers, depth, queue, d + 1);
             }
         }
 

@@ -60,4 +60,12 @@ public class PaperDtos {
     }
 
     public record DecisionRequest(String decision, String note) {}
+
+    public record EditMetadataRequest(
+            String title,
+            String authorsText,
+            String category,
+            String keywords,
+            String abstractText
+    ) {}
 }

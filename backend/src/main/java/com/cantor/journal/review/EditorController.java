@@ -2,12 +2,12 @@ package com.cantor.journal.review;
 
 import com.cantor.journal.review.dto.ReviewDtos.AssignRequest;
 import com.cantor.journal.review.dto.ReviewDtos.AssignmentResponse;
-import com.cantor.journal.review.dto.ReviewDtos.ReviewResponse;
 import com.cantor.journal.security.UserPrincipal;
 import com.cantor.journal.user.UserRepository;
 import com.cantor.journal.user.dto.AuthDtos.UserSummary;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -46,5 +46,12 @@ public class EditorController {
         return reviewService.assignmentsForPaper(paperId).stream()
                 .map(a -> AssignmentResponse.from(a, reviewService.reviewSubmitted(a.getId())))
                 .toList();
+    }
+
+    @DeleteMapping("/papers/{paperId}/assignments/{assignmentId}")
+    public ResponseEntity<Void> cancelAssignment(@PathVariable Long paperId,
+                                                 @PathVariable Long assignmentId) {
+        reviewService.cancelAssignment(paperId, assignmentId);
+        return ResponseEntity.noContent().build();
     }
 }

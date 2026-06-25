@@ -14,6 +14,8 @@ export default function PaperDetail() {
   const [versions, setVersions] = useState([]);
   const [resub, setResub] = useState({ file: null, response: '' });
   const [resubBusy, setResubBusy] = useState(false);
+  const [requests, setRequests] = useState([]);
+  const [reqForm, setReqForm] = useState({ type: 'EDIT', message: '' });
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
 
@@ -37,8 +39,24 @@ export default function PaperDetail() {
       client.get(`/papers/${id}/versions`)
         .then(({ data }) => setVersions(data))
         .catch(() => {});
+      client.get(`/papers/${id}/requests`)
+        .then(({ data }) => setRequests(data))
+        .catch(() => {});
     }
   }, [paper, user, id, hasRole]);
+
+  const submitRequest = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await client.post(`/papers/${id}/requests`, reqForm);
+      setReqForm({ type: 'EDIT', message: '' });
+      const { data } = await client.get(`/papers/${id}/requests`);
+      setRequests(data);
+    } catch (err) {
+      setError(apiError(err, '요청 전송에 실패했습니다.'));
+    }
+  };
 
   const downloadVersion = async (versionNo) => {
     try {
@@ -232,6 +250,42 @@ export default function PaperDetail() {
                 <button className="btn btn-primary" disabled={resubBusy}>
                   {resubBusy ? '재제출 중…' : '재제출'}
                 </button>
+              </form>
+            </section>
+          )}
+
+          {isOwner && (
+            <section className="reviews">
+              <div className="section-head"><h2>편집장에게 요청</h2></div>
+              {requests.length > 0 && (
+                <ul className="request-list">
+                  {requests.map((r) => (
+                    <li key={r.id} className="request-item">
+                      <span className={`badge ${r.status === 'PENDING' ? 'status-SUBMITTED' : r.status === 'RESOLVED' ? 'status-PUBLISHED' : 'status-REJECTED'}`}>
+                        {r.type === 'EDIT' ? '수정' : '삭제'} · {r.status === 'PENDING' ? '대기' : r.status === 'RESOLVED' ? '처리됨' : '거절됨'}
+                      </span>
+                      <div className="request-body">
+                        <div>{r.message}</div>
+                        {r.editorNote && <div className="muted small">편집장: {r.editorNote}</div>}
+                        <div className="muted small">{longDate(r.createdAt)}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form className="form" onSubmit={submitRequest}>
+                <label>요청 유형
+                  <select value={reqForm.type} onChange={(e) => setReqForm({ ...reqForm, type: e.target.value })}>
+                    <option value="EDIT">수정 요청</option>
+                    <option value="DELETE">삭제 요청</option>
+                  </select>
+                </label>
+                <label>내용
+                  <textarea rows={3} value={reqForm.message}
+                    onChange={(e) => setReqForm({ ...reqForm, message: e.target.value })}
+                    placeholder="수정/삭제가 필요한 사유를 적어주세요." />
+                </label>
+                <button className="btn btn-primary">요청 보내기</button>
               </form>
             </section>
           )}

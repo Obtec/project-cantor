@@ -10,6 +10,7 @@ import IssueDetail from './pages/IssueDetail.jsx';
 import SubmitPaper from './pages/SubmitPaper.jsx';
 import MySubmissions from './pages/MySubmissions.jsx';
 import ReviewDashboard from './pages/ReviewDashboard.jsx';
+import ReviewSubmit from './pages/ReviewSubmit.jsx';
 import EditorDashboard from './pages/EditorDashboard.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="submit" element={<RequireAuth><SubmitPaper /></RequireAuth>} />
         <Route path="my" element={<RequireAuth><MySubmissions /></RequireAuth>} />
         <Route path="reviews" element={<RequireRole role="REVIEWER"><ReviewDashboard /></RequireRole>} />
+        <Route path="reviews/:assignmentId" element={<RequireRole role="REVIEWER"><ReviewSubmit /></RequireRole>} />
         <Route path="editor" element={<RequireRole role="EDITOR"><EditorDashboard /></RequireRole>} />
         <Route path="*" element={<div><h2>페이지를 찾을 수 없습니다.</h2></div>} />
       </Route>

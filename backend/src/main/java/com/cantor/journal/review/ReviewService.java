@@ -56,6 +56,31 @@ public class ReviewService {
         return assignment;
     }
 
+    /** 편집자가 리뷰어 배정을 취소한다. 제출된 심사가 있으면 함께 삭제하고 리뷰어에게 알린다. */
+    @Transactional
+    public void cancelAssignment(Long paperId, Long assignmentId) {
+        ReviewAssignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> ApiException.notFound("배정을 찾을 수 없습니다."));
+        if (!assignment.getPaper().getId().equals(paperId)) {
+            throw ApiException.badRequest("해당 논문의 배정이 아닙니다.");
+        }
+        boolean lastOne = assignmentRepository.findByPaperId(paperId).size() <= 1;
+        User reviewer = assignment.getReviewer();
+        String title = assignment.getPaper().getTitle();
+
+        reviewRepository.deleteByAssignmentId(assignmentId);
+        assignmentRepository.delete(assignment);
+
+        if (lastOne) {
+            paperService.revertToSubmitted(paperId);
+        }
+        notificationService.notify(
+                reviewer,
+                NotificationType.ASSIGNMENT_CANCELLED,
+                "심사 배정이 취소되었습니다: " + title,
+                "/reviews");
+    }
+
     @Transactional(readOnly = true)
     public List<ReviewAssignment> assignmentsForReviewer(Long reviewerId) {
         return assignmentRepository.findByReviewerIdOrderByCreatedAtDesc(reviewerId);

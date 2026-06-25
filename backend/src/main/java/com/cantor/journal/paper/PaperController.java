@@ -5,6 +5,7 @@ import com.cantor.journal.citation.dto.CitationDtos.CitationGraph;
 import com.cantor.journal.common.ApiException;
 import com.cantor.journal.issue.dto.IssueDtos.PublishPaperRequest;
 import com.cantor.journal.paper.dto.PaperDtos.DecisionRequest;
+import com.cantor.journal.paper.dto.PaperDtos.EditMetadataRequest;
 import com.cantor.journal.paper.dto.PaperDtos.PaperResponse;
 import com.cantor.journal.paper.dto.VersionDtos.VersionResponse;
 import com.cantor.journal.review.Review;
@@ -42,18 +43,24 @@ public class PaperController {
     public List<PaperResponse> list(@RequestParam(required = false) PaperStatus status,
                                     @RequestParam(required = false, defaultValue = "false") boolean mine,
                                     @AuthenticationPrincipal UserPrincipal principal) {
-        List<Paper> papers = (mine && principal != null)
-                ? paperService.listMine(principal.getId())
-                : paperService.list(status);
+        List<Paper> papers;
+        if (mine && principal != null) {
+            papers = paperService.listMine(principal.getId());
+        } else if (isEditor(principal)) {
+            papers = paperService.list(status);
+        } else {
+            // 비편집자: 게재된 논문만 노출
+            papers = paperService.list(PaperStatus.PUBLISHED);
+        }
         return paperService.responses(papers, principal);
     }
 
     @GetMapping("/{id}")
     public PaperResponse get(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return paperService.response(paperService.get(id), principal);
+        return paperService.response(paperService.getViewable(id, principal), principal);
     }
 
-    /** 서버 검색 + 페이지네이션. */
+    /** 서버 검색 + 페이지네이션. 비편집자에게는 게재된 논문만 노출. */
     @GetMapping("/search")
     public Map<String, Object> search(@RequestParam(required = false) String q,
                                       @RequestParam(required = false) String category,
@@ -61,7 +68,8 @@ public class PaperController {
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "10") int size,
                                       @AuthenticationPrincipal UserPrincipal principal) {
-        var result = paperService.search(q, category, status, page, size);
+        PaperStatus effectiveStatus = isEditor(principal) ? status : PaperStatus.PUBLISHED;
+        var result = paperService.search(q, category, effectiveStatus, page, size);
         return Map.of(
                 "content", paperService.responses(result.getContent(), principal),
                 "page", result.getNumber(),
@@ -72,8 +80,9 @@ public class PaperController {
 
     /** RIS(EndNote/Zotero 등) 형식 인용 내보내기. */
     @GetMapping(value = "/{id}/cite.ris", produces = "application/x-research-info-systems")
-    public ResponseEntity<String> ris(@PathVariable Long id) {
-        Paper p = paperService.get(id);
+    public ResponseEntity<String> ris(@PathVariable Long id,
+                                      @AuthenticationPrincipal UserPrincipal principal) {
+        Paper p = paperService.getViewable(id, principal);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + (p.getArticleCode() == null ? "paper" : p.getArticleCode()) + ".ris\"")
@@ -120,8 +129,14 @@ public class PaperController {
     }
 
     @GetMapping("/{id}/citation-graph")
-    public CitationGraph citationGraph(@PathVariable Long id) {
+    public CitationGraph citationGraph(@PathVariable Long id,
+                                       @AuthenticationPrincipal UserPrincipal principal) {
+        paperService.getViewable(id, principal);
         return citationService.graph(id);
+    }
+
+    private boolean isEditor(UserPrincipal principal) {
+        return principal != null && principal.getUser().getRoles().contains(Role.EDITOR);
     }
 
     /** 심사 의견 조회: 편집자는 전체, 저자(제출자)는 결정 후 익명 의견만 본다. */
@@ -183,8 +198,9 @@ public class PaperController {
     }
 
     @GetMapping("/{id}/file")
-    public ResponseEntity<Resource> download(@PathVariable Long id) {
-        Paper paper = paperService.get(id);
+    public ResponseEntity<Resource> download(@PathVariable Long id,
+                                             @AuthenticationPrincipal UserPrincipal principal) {
+        Paper paper = paperService.getViewable(id, principal);
         Resource resource = paperService.download(id);
         String filename = paper.getFileName() == null ? "paper.pdf" : paper.getFileName();
         String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
@@ -199,6 +215,14 @@ public class PaperController {
     @PreAuthorize("hasRole('EDITOR')")
     public PaperResponse decide(@PathVariable Long id, @RequestBody DecisionRequest req) {
         return paperService.response(paperService.decide(id, req));
+    }
+
+    /** 편집자가 논문 메타데이터(제목/저자/분야/키워드/초록)를 수정한다. */
+    @PutMapping("/{id}/metadata")
+    @PreAuthorize("hasRole('EDITOR')")
+    public PaperResponse editMetadata(@PathVariable Long id, @RequestBody EditMetadataRequest req) {
+        return paperService.response(paperService.editByEditor(
+                id, req.title(), req.authorsText(), req.category(), req.keywords(), req.abstractText()));
     }
 
     @DeleteMapping("/{id}")

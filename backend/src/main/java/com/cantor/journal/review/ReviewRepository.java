@@ -13,4 +13,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     boolean existsByAssignmentId(Long assignmentId);
 
     void deleteByAssignmentPaperId(Long paperId);
+
+    void deleteByAssignmentId(Long assignmentId);
 }

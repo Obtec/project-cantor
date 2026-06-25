@@ -7,6 +7,7 @@ import com.cantor.journal.issue.Issue;
 import com.cantor.journal.issue.IssueRepository;
 import com.cantor.journal.notification.NotificationService;
 import com.cantor.journal.notification.NotificationType;
+import com.cantor.journal.request.PaperRequestRepository;
 import com.cantor.journal.paper.dto.PaperDtos.DecisionRequest;
 import com.cantor.journal.paper.dto.PaperDtos.PaperResponse;
 import com.cantor.journal.review.ReviewAssignmentRepository;
@@ -41,6 +42,7 @@ public class PaperService {
     private final UserRepository userRepository;
     private final ManuscriptVersionRepository manuscriptVersionRepository;
     private final IssueRepository issueRepository;
+    private final PaperRequestRepository paperRequestRepository;
 
     @Value("${app.review.double-blind:true}")
     private boolean doubleBlind;
@@ -107,6 +109,49 @@ public class PaperService {
     public Paper get(Long id) {
         return paperRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("논문을 찾을 수 없습니다."));
+    }
+
+    /**
+     * 열람 가능 여부: 게재된 논문은 누구나, 미게재 논문은 편집자/저자/배정 리뷰어만.
+     */
+    @Transactional(readOnly = true)
+    public boolean canView(Paper p, UserPrincipal principal) {
+        if (p.getStatus() == PaperStatus.PUBLISHED) {
+            return true;
+        }
+        if (principal == null) {
+            return false;
+        }
+        if (principal.getUser().getRoles().contains(Role.EDITOR)) {
+            return true;
+        }
+        if (p.getSubmitter().getId().equals(principal.getId())) {
+            return true;
+        }
+        return reviewAssignmentRepository.existsByPaperIdAndReviewerId(p.getId(), principal.getId());
+    }
+
+    /** 미게재 논문이면 열람 권한을 확인하고, 없으면 존재를 숨기기 위해 404를 던진다. */
+    @Transactional(readOnly = true)
+    public Paper getViewable(Long id, UserPrincipal principal) {
+        Paper p = get(id);
+        if (!canView(p, principal)) {
+            throw ApiException.notFound("논문을 찾을 수 없습니다.");
+        }
+        return p;
+    }
+
+    /** 편집자가 논문 메타데이터(제목/저자/분야/키워드/초록)를 수정한다. */
+    @Transactional
+    public Paper editByEditor(Long id, String title, String authorsText,
+                              String category, String keywords, String abstractText) {
+        Paper paper = get(id);
+        if (title != null && !title.isBlank()) paper.setTitle(title);
+        if (authorsText != null) paper.setAuthorsText(authorsText);
+        if (category != null) paper.setCategory(category);
+        if (keywords != null) paper.setKeywords(keywords);
+        if (abstractText != null) paper.setAbstractText(abstractText);
+        return paperRepository.save(paper);
     }
 
     @Transactional
@@ -284,6 +329,7 @@ public class PaperService {
         reviewRepository.deleteByAssignmentPaperId(id);
         reviewAssignmentRepository.deleteByPaperId(id);
         citationService.deleteForPaper(id);
+        paperRequestRepository.deleteByPaperId(id);
         manuscriptVersionRepository.findByPaperIdOrderByVersionNoAsc(id)
                 .forEach(v -> fileStorageService.delete(v.getStoredPath()));
         manuscriptVersionRepository.deleteByPaperId(id);
@@ -297,14 +343,14 @@ public class PaperService {
         return PaperResponse.from(paper, citationService.citationCount(paper.getId()));
     }
 
-    /** 요청자 기준으로 이중맹검을 적용한 단일 응답. */
+    /** 요청자 기준으로 블라인드 테스트을 적용한 단일 응답. */
     @Transactional(readOnly = true)
     public PaperResponse response(Paper paper, UserPrincipal principal) {
         return blindIfNeeded(PaperResponse.from(paper, citationService.citationCount(paper.getId())),
                 paper, principal);
     }
 
-    /** 목록 응답(피인용수 배치 집계 + 이중맹검). */
+    /** 목록 응답(피인용수 배치 집계 + 블라인드 테스트). */
     @Transactional(readOnly = true)
     public List<PaperResponse> responses(List<Paper> papers, UserPrincipal principal) {
         List<Long> ids = papers.stream().map(Paper::getId).toList();
@@ -314,7 +360,7 @@ public class PaperService {
                 .toList();
     }
 
-    /** 이중맹검: 리뷰어(편집자·저자 본인 제외)가 게재 전 논문을 볼 때 저자 정보를 가린다. */
+    /** 블라인드 테스트: 리뷰어(편집자·저자 본인 제외)가 게재 전 논문을 볼 때 저자 정보를 가린다. */
     private PaperResponse blindIfNeeded(PaperResponse r, Paper p, UserPrincipal principal) {
         if (!doubleBlind || p.getStatus() == PaperStatus.PUBLISHED || principal == null) {
             return r;
@@ -326,7 +372,7 @@ public class PaperService {
         if (reviewer && !editor && !owner) {
             return new PaperResponse(
                     r.id(), r.title(), r.abstractText(),
-                    "(이중맹검 — 저자 비공개)", r.keywords(), r.category(), r.status(),
+                    "(블라인드 테스트 — 저자 비공개)", r.keywords(), r.category(), r.status(),
                     new UserSummary(null, "익명", ""),
                     r.fileName(), r.fileSize(), r.decisionNote(), r.citationCount(),
                     r.articleCode(), r.issueLabel(), r.pages(), r.publishedAt(),
@@ -339,6 +385,16 @@ public class PaperService {
     public void markUnderReview(Paper paper) {
         if (paper.getStatus() == PaperStatus.SUBMITTED) {
             paper.setStatus(PaperStatus.UNDER_REVIEW);
+            paperRepository.save(paper);
+        }
+    }
+
+    /** 모든 배정이 취소되었을 때 심사중 → 제출됨으로 되돌린다. */
+    @Transactional
+    public void revertToSubmitted(Long paperId) {
+        Paper paper = get(paperId);
+        if (paper.getStatus() == PaperStatus.UNDER_REVIEW) {
+            paper.setStatus(PaperStatus.SUBMITTED);
             paperRepository.save(paper);
         }
     }

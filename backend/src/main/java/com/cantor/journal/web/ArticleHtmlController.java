@@ -2,6 +2,7 @@ package com.cantor.journal.web;
 
 import com.cantor.journal.paper.Paper;
 import com.cantor.journal.paper.PaperService;
+import com.cantor.journal.paper.PaperStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
@@ -35,7 +36,10 @@ public class ArticleHtmlController {
         String html = loadTemplate();
         try {
             Paper p = paperService.get(id);
-            html = html.replace("</head>", buildMeta(p) + "</head>");
+            // 게재된 논문만 색인 메타데이터를 노출(미게재 논문 숨김)
+            if (p.getStatus() == PaperStatus.PUBLISHED) {
+                html = html.replace("</head>", buildMeta(p) + "</head>");
+            }
         } catch (Exception ignore) {
             // 논문이 없으면 기본 index.html 반환
         }

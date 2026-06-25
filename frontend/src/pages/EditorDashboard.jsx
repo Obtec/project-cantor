@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import client, { apiError } from '../api/client.js';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { recommendationLabel, formatDate } from '../labels.js';
+import { recommendationLabel, formatDate, CATEGORIES } from '../labels.js';
 
 const DECISIONS = [
   ['ACCEPT', '게재 확정'],
@@ -19,6 +19,11 @@ function PaperManager({ paper, reviewers, issues, onChanged }) {
   const [decision, setDecision] = useState('ACCEPT');
   const [note, setNote] = useState('');
   const [pub, setPub] = useState({ issueId: '', pageStart: '', pageEnd: '' });
+  const [meta, setMeta] = useState({
+    title: paper.title || '', authorsText: paper.authorsText || '',
+    category: paper.category || '', keywords: paper.keywords || '', abstractText: paper.abstractText || '',
+  });
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
@@ -71,6 +76,30 @@ function PaperManager({ paper, reviewers, issues, onChanged }) {
     }
   };
 
+  const saveMeta = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await client.put(`/papers/${paper.id}/metadata`, meta);
+      setEditing(false);
+      onChanged();
+    } catch (err) {
+      setError(apiError(err, '메타데이터 수정에 실패했습니다.'));
+    }
+  };
+
+  const cancelAssign = async (assignmentId) => {
+    if (!window.confirm('이 리뷰어 배정을 취소하시겠습니까?\n제출된 심사가 있으면 함께 삭제됩니다.')) return;
+    setError('');
+    try {
+      await client.delete(`/papers/${paper.id}/assignments/${assignmentId}`);
+      load();
+      onChanged();
+    } catch (err) {
+      setError(apiError(err, '배정 취소에 실패했습니다.'));
+    }
+  };
+
   const publish = async (e) => {
     e.preventDefault();
     setError('');
@@ -93,9 +122,28 @@ function PaperManager({ paper, reviewers, issues, onChanged }) {
         <h3><Link to={`/papers/${paper.id}`}>{paper.title}</Link></h3>
         <div className="detail-head-actions">
           <StatusBadge status={paper.status} />
+          <button className="btn btn-ghost btn-sm" onClick={() => setEditing(!editing)}>
+            {editing ? '닫기' : '메타 수정'}
+          </button>
           <button className="btn btn-danger btn-sm" onClick={remove}>삭제</button>
         </div>
       </div>
+
+      {editing && (
+        <form className="form" onSubmit={saveMeta} style={{ margin: '0.5rem 0 1rem' }}>
+          <label>제목<input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} /></label>
+          <label>저자<input value={meta.authorsText} onChange={(e) => setMeta({ ...meta, authorsText: e.target.value })} /></label>
+          <label>분야
+            <select value={meta.category} onChange={(e) => setMeta({ ...meta, category: e.target.value })}>
+              <option value="">미분류</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
+          <label>키워드<input value={meta.keywords} onChange={(e) => setMeta({ ...meta, keywords: e.target.value })} /></label>
+          <label>초록<textarea rows={4} value={meta.abstractText} onChange={(e) => setMeta({ ...meta, abstractText: e.target.value })} /></label>
+          <button className="btn btn-primary">저장</button>
+        </form>
+      )}
       <p className="muted small">{paper.authorsText || paper.submitter?.name} · {formatDate(paper.updatedAt)}</p>
       {error && <div className="alert error">{error}</div>}
 
@@ -123,6 +171,7 @@ function PaperManager({ paper, reviewers, issues, onChanged }) {
                 <span className={`badge ${a.reviewSubmitted ? 'status-PUBLISHED' : 'status-SUBMITTED'}`}>
                   {a.reviewSubmitted ? '완료' : a.status === 'DECLINED' ? '거절' : '대기'}
                 </span>
+                <button className="btn-link-sm" onClick={() => cancelAssign(a.id)}>취소</button>
               </li>
             ))}
             {assignments.length === 0 && <li className="muted">배정된 리뷰어 없음</li>}
@@ -181,10 +230,94 @@ function PaperManager({ paper, reviewers, issues, onChanged }) {
   );
 }
 
+function PendingRequests({ requests, onChanged }) {
+  const resolve = async (id, status) => {
+    let note = '';
+    if (status === 'REJECTED') note = window.prompt('거절 사유(선택):') || '';
+    try {
+      await client.post(`/requests/${id}/resolve`, { status, note });
+      onChanged();
+    } catch { /* noop */ }
+  };
+
+  if (requests.length === 0) return null;
+  return (
+    <div className="card" style={{ borderTop: '3px solid var(--gold)' }}>
+      <h3 style={{ marginTop: 0 }}>처리 대기 요청 ({requests.length})</h3>
+      <ul className="request-list">
+        {requests.map((r) => (
+          <li key={r.id} className="request-item">
+            <span className={`badge ${r.type === 'DELETE' ? 'status-REJECTED' : 'status-SUBMITTED'}`}>
+              {r.type === 'EDIT' ? '수정' : '삭제'}
+            </span>
+            <div className="request-body">
+              <Link to={`/papers/${r.paperId}`}><strong>{r.paperTitle}</strong></Link>
+              <span className="muted small"> · {r.requesterName}</span>
+              <div>{r.message}</div>
+            </div>
+            <div className="request-actions">
+              <button className="btn btn-primary btn-sm" onClick={() => resolve(r.id, 'RESOLVED')}>처리</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => resolve(r.id, 'REJECTED')}>거절</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function UserManagement() {
+  const [users, setUsers] = useState([]);
+  const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const load = () => client.get('/editor/users').then(({ data }) => setUsers(data)).catch((e) => setError(apiError(e)));
+  useEffect(() => { if (open) load(); }, [open]);
+
+  const toggle = async (u, isEditor) => {
+    setError('');
+    try {
+      if (isEditor) await client.delete(`/editor/users/${u.id}/editor`);
+      else await client.post(`/editor/users/${u.id}/editor`);
+      load();
+    } catch (err) { setError(apiError(err, '권한 변경 실패')); }
+  };
+
+  return (
+    <div className="card">
+      <div className="detail-head">
+        <h3 style={{ margin: 0 }}>편집위원 관리</h3>
+        <button className="btn btn-ghost btn-sm" onClick={() => setOpen(!open)}>{open ? '닫기' : '열기'}</button>
+      </div>
+      {error && <div className="alert error">{error}</div>}
+      {open && (
+        <ul className="user-admin-list">
+          {users.map((u) => {
+            const isEditor = u.roles.includes('EDITOR');
+            return (
+              <li key={u.id} className="user-admin-item">
+                <div>
+                  <strong>{u.name}</strong> <span className="muted small">{u.email}</span>
+                  <div className="muted small">{u.roles.join(', ')}</div>
+                </div>
+                <button className={`btn btn-sm ${isEditor ? 'btn-danger' : 'btn-primary'}`}
+                  onClick={() => toggle(u, isEditor)}>
+                  {isEditor ? '편집장 회수' : '편집장 부여'}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function EditorDashboard() {
   const [papers, setPapers] = useState([]);
   const [reviewers, setReviewers] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -193,8 +326,9 @@ export default function EditorDashboard() {
       client.get('/papers'),
       client.get('/editor/reviewers'),
       client.get('/issues'),
+      client.get('/requests'),
     ])
-      .then(([p, r, i]) => { setPapers(p.data); setReviewers(r.data); setIssues(i.data); })
+      .then(([p, r, i, q]) => { setPapers(p.data); setReviewers(r.data); setIssues(i.data); setRequests(q.data); })
       .catch((err) => setError(apiError(err)))
       .finally(() => setLoading(false));
   }, []);
@@ -205,6 +339,8 @@ export default function EditorDashboard() {
     <div>
       <h2>편집 대시보드</h2>
       {error && <div className="alert error">{error}</div>}
+      <PendingRequests requests={requests} onChanged={load} />
+      <UserManagement />
       {loading ? (
         <p className="muted">불러오는 중…</p>
       ) : papers.length === 0 ? (

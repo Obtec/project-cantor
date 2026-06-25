@@ -48,4 +48,17 @@ public class AuthDtos {
             return new UserSummary(user.getId(), user.getName(), user.getEmail());
         }
     }
+
+    public record UserAdminResponse(
+            Long id,
+            String name,
+            String email,
+            String affiliation,
+            Set<Role> roles
+    ) {
+        public static UserAdminResponse from(User user) {
+            return new UserAdminResponse(
+                    user.getId(), user.getName(), user.getEmail(), user.getAffiliation(), user.getRoles());
+        }
+    }
 }
