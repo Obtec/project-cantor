@@ -55,13 +55,11 @@ services:
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN:?DOMAIN 을 .env 에 설정하세요}
-      NGINX_ENVSUBST_FILTER: DOMAIN   # 템플릿에서 ${DOMAIN} 만 치환($host 등 nginx 변수는 보존)
     volumes:
-      - ./nginx/templates:/etc/nginx/templates:ro
       - ./nginx/proxy-entrypoint.sh:/proxy-entrypoint.sh:ro
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
-    # 기본 entrypoint(envsubst 처리)는 유지하고, command 로 더미 인증서 보장 + reload 워커를 띄운다.
+    # 인증서 유무에 따라 HTTP 전용 / HTTPS 설정을 스스로 생성하고 nginx를 띄운다.
     command: ["/bin/sh", "/proxy-entrypoint.sh"]
     depends_on:
       - backend

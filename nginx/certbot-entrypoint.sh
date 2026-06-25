@@ -14,15 +14,13 @@ if [ "${STAGING:-0}" != "0" ]; then
     echo "[certbot] STAGING 모드(테스트용)로 발급합니다."
 fi
 
-# 진짜 인증서가 아직 없거나(또는 proxy가 만든 더미만 있으면) 발급한다.
-if [ ! -f "$LIVE/fullchain.pem" ] || [ -f "$LIVE/.dummy" ]; then
+if [ ! -f "$LIVE/fullchain.pem" ]; then
     echo "[certbot] proxy(80) 연결을 기다립니다..."
     until python3 -c "import socket; socket.create_connection(('proxy', 80), 3)" 2>/dev/null; do
         sleep 3
     done
 
     echo "[certbot] ${DOMAIN} 인증서를 발급합니다..."
-    rm -rf "$LIVE"   # proxy가 만든 더미 제거 후 깨끗하게 발급
     if ! certbot certonly --webroot -w /var/www/certbot $staging_arg \
             --email "$EMAIL" --agree-tos --no-eff-email --non-interactive \
             -d "$DOMAIN"; then
