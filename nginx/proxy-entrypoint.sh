@@ -15,6 +15,9 @@ rm -f /etc/nginx/conf.d/default.conf
 # HTTP 전용(인증서 발급 전): 챌린지를 서빙하고 나머지는 백엔드로 프록시한다.
 write_http_only() {
     cat > "$CONF" <<EOF
+# 로그인 무차별 대입 방지: IP당 분당 5회(+버스트 10)로 제한.
+limit_req_zone \$binary_remote_addr zone=login:10m rate=5r/m;
+
 server {
     listen 80;
     server_name $DOMAIN;
@@ -24,6 +27,17 @@ server {
     }
 
     client_max_body_size 50m;
+
+    location = /api/auth/login {
+        limit_req zone=login burst=10 nodelay;
+        resolver 127.0.0.11 valid=30s;
+        set \$backend http://backend:8080;
+        proxy_pass \$backend;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 
     location / {
         resolver 127.0.0.11 valid=30s;
@@ -41,6 +55,9 @@ EOF
 # HTTP+HTTPS(인증서 발급 후): HTTP는 HTTPS로 리다이렉트, HTTPS에서 백엔드 프록시.
 write_full() {
     cat > "$CONF" <<EOF
+# 로그인 무차별 대입 방지: IP당 분당 5회(+버스트 10)로 제한.
+limit_req_zone \$binary_remote_addr zone=login:10m rate=5r/m;
+
 server {
     listen 80;
     server_name $DOMAIN;
@@ -62,7 +79,24 @@ server {
     ssl_certificate     $LIVE/fullchain.pem;
     ssl_certificate_key $LIVE/privkey.pem;
 
+    # 보안 헤더
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
     client_max_body_size 50m;
+
+    location = /api/auth/login {
+        limit_req zone=login burst=10 nodelay;
+        resolver 127.0.0.11 valid=30s;
+        set \$backend http://backend:8080;
+        proxy_pass \$backend;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 
     location / {
         resolver 127.0.0.11 valid=30s;
