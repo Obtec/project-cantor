@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client, { apiError } from '../api/client.js';
-import { CATEGORIES } from '../labels.js';
+import { CATEGORIES, ARTICLE_TYPES } from '../labels.js';
 
 export default function SubmitPaper() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ title: '', abstractText: '', authorsText: '', keywords: '', category: CATEGORIES[0] });
+  const [form, setForm] = useState({ title: '', abstractText: '', authorsText: '', keywords: '', category: '', articleType: '' });
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,6 +23,7 @@ export default function SubmitPaper() {
     fd.append('authorsText', form.authorsText);
     fd.append('keywords', form.keywords);
     fd.append('category', form.category);
+    fd.append('articleType', form.articleType);
     fd.append('file', file);
     try {
       const { data } = await client.post('/papers', fd);
@@ -42,10 +43,19 @@ export default function SubmitPaper() {
         <label>제목 *
           <input value={form.title} onChange={update('title')} required />
         </label>
-        <label>분야 *
-          <select value={form.category} onChange={update('category')} required>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+        <label>분야 * <span className="muted">(직접 입력 가능)</span>
+          <input list="category-suggestions" value={form.category} onChange={update('category')}
+            placeholder="예: 수학, 물리학, 컴퓨터과학…" required />
+          <datalist id="category-suggestions">
+            {CATEGORIES.map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </label>
+        <label>논문 종류 <span className="muted">(직접 입력 가능)</span>
+          <input list="type-suggestions" value={form.articleType} onChange={update('articleType')}
+            placeholder="예: 원저 논문, 리뷰, 공부 노트…" />
+          <datalist id="type-suggestions">
+            {ARTICLE_TYPES.map((t) => <option key={t} value={t} />)}
+          </datalist>
         </label>
         <label>저자 <span className="muted">(쉼표로 구분)</span>
           <input value={form.authorsText} onChange={update('authorsText')} placeholder="홍길동, 김수학" />

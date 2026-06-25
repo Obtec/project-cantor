@@ -15,6 +15,7 @@ public class PaperDtos {
             String authorsText,
             String keywords,
             String category,
+            String articleType,
             PaperStatus status,
             UserSummary submitter,
             String fileName,
@@ -43,6 +44,7 @@ public class PaperDtos {
                     p.getAuthorsText(),
                     p.getKeywords(),
                     p.getCategory(),
+                    p.getArticleType(),
                     p.getStatus(),
                     UserSummary.from(p.getSubmitter()),
                     p.getFileName(),
@@ -65,6 +67,7 @@ public class PaperDtos {
             String title,
             String authorsText,
             String category,
+            String articleType,
             String keywords,
             String abstractText
     ) {}

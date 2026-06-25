@@ -94,7 +94,7 @@ export default function IssueDetail() {
           {articles.map((p) => (
             <li key={p.id} className="toc-item">
               <div className="toc-main">
-                <div className="eyebrow">{p.category || '논문'}</div>
+                <div className="eyebrow">{p.category || '미분류'} · {p.articleType || 'Original Research'}</div>
                 <h3 className="article-title"><Link to={`/papers/${p.id}`}>{p.title}</Link></h3>
                 <div className="authors">{p.authorsText || p.submitter?.name}</div>
                 <div className="toc-citation">

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import client, { apiError } from '../api/client.js';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { recommendationLabel, formatDate, CATEGORIES } from '../labels.js';
+import { recommendationLabel, formatDate, CATEGORIES, ARTICLE_TYPES } from '../labels.js';
 
 const DECISIONS = [
   ['ACCEPT', '게재 확정'],
@@ -21,7 +21,8 @@ function PaperManager({ paper, reviewers, issues, onChanged }) {
   const [pub, setPub] = useState({ issueId: '', pageStart: '', pageEnd: '' });
   const [meta, setMeta] = useState({
     title: paper.title || '', authorsText: paper.authorsText || '',
-    category: paper.category || '', keywords: paper.keywords || '', abstractText: paper.abstractText || '',
+    category: paper.category || '', articleType: paper.articleType || '',
+    keywords: paper.keywords || '', abstractText: paper.abstractText || '',
   });
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
@@ -134,10 +135,14 @@ function PaperManager({ paper, reviewers, issues, onChanged }) {
           <label>제목<input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} /></label>
           <label>저자<input value={meta.authorsText} onChange={(e) => setMeta({ ...meta, authorsText: e.target.value })} /></label>
           <label>분야
-            <select value={meta.category} onChange={(e) => setMeta({ ...meta, category: e.target.value })}>
-              <option value="">미분류</option>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <input list={`cat-sg-${paper.id}`} value={meta.category}
+              onChange={(e) => setMeta({ ...meta, category: e.target.value })} placeholder="직접 입력 가능" />
+            <datalist id={`cat-sg-${paper.id}`}>{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
+          </label>
+          <label>논문 종류
+            <input list={`type-sg-${paper.id}`} value={meta.articleType}
+              onChange={(e) => setMeta({ ...meta, articleType: e.target.value })} placeholder="직접 입력 가능" />
+            <datalist id={`type-sg-${paper.id}`}>{ARTICLE_TYPES.map((t) => <option key={t} value={t} />)}</datalist>
           </label>
           <label>키워드<input value={meta.keywords} onChange={(e) => setMeta({ ...meta, keywords: e.target.value })} /></label>
           <label>초록<textarea rows={4} value={meta.abstractText} onChange={(e) => setMeta({ ...meta, abstractText: e.target.value })} /></label>

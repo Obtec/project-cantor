@@ -143,12 +143,13 @@ public class PaperService {
 
     /** 편집자가 논문 메타데이터(제목/저자/분야/키워드/초록)를 수정한다. */
     @Transactional
-    public Paper editByEditor(Long id, String title, String authorsText,
-                              String category, String keywords, String abstractText) {
+    public Paper editByEditor(Long id, String title, String authorsText, String category,
+                              String articleType, String keywords, String abstractText) {
         Paper paper = get(id);
         if (title != null && !title.isBlank()) paper.setTitle(title);
         if (authorsText != null) paper.setAuthorsText(authorsText);
         if (category != null) paper.setCategory(category);
+        if (articleType != null) paper.setArticleType(articleType);
         if (keywords != null) paper.setKeywords(keywords);
         if (abstractText != null) paper.setAbstractText(abstractText);
         return paperRepository.save(paper);
@@ -156,7 +157,7 @@ public class PaperService {
 
     @Transactional
     public Paper submit(User submitter, String title, String abstractText,
-                        String authorsText, String keywords, String category,
+                        String authorsText, String keywords, String category, String articleType,
                         MultipartFile file) {
         if (title == null || title.isBlank()) {
             throw ApiException.badRequest("제목은 필수입니다.");
@@ -168,6 +169,7 @@ public class PaperService {
                 .authorsText(authorsText)
                 .keywords(keywords)
                 .category(category)
+                .articleType(articleType)
                 .status(PaperStatus.SUBMITTED)
                 .submitter(submitter)
                 .fileName(file.getOriginalFilename())
@@ -372,7 +374,7 @@ public class PaperService {
         if (reviewer && !editor && !owner) {
             return new PaperResponse(
                     r.id(), r.title(), r.abstractText(),
-                    "(블라인드 테스트 — 저자 비공개)", r.keywords(), r.category(), r.status(),
+                    "(블라인드 테스트 — 저자 비공개)", r.keywords(), r.category(), r.articleType(), r.status(),
                     new UserSummary(null, "익명", ""),
                     r.fileName(), r.fileSize(), r.decisionNote(), r.citationCount(),
                     r.articleCode(), r.issueLabel(), r.pages(), r.publishedAt(),

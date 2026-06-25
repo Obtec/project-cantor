@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import client, { apiError } from '../api/client.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CitationTree from '../components/CitationTree.jsx';
-import { recommendationLabel, longDate, articleCode, citation, bibtex, categoryLabel } from '../labels.js';
+import { recommendationLabel, longDate, articleCode, citation, bibtex, categoryLabel, articleTypeLabel } from '../labels.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 export default function PaperDetail() {
@@ -123,7 +123,7 @@ export default function PaperDetail() {
       <div className="article-layout">
         <article className="article-main">
           <header className="article-header">
-            <div className="eyebrow">{categoryLabel(paper.category)} · Original Research</div>
+            <div className="eyebrow">{categoryLabel(paper.category)} · {articleTypeLabel(paper.articleType)}</div>
             <h1>{paper.title}</h1>
             <div className="article-authors">{paper.authorsText || paper.submitter?.name}</div>
             {paper.submitter && (
@@ -298,7 +298,7 @@ export default function PaperDetail() {
             <div className="meta-row"><span className="k">피인용수</span><span className="v">{paper.citationCount ?? 0}</span></div>
             <div className="meta-row"><span className="k">논문 번호</span><span className="v">{articleCode(paper)}</span></div>
             <div className="meta-row"><span className="k">분야</span><span className="v">{categoryLabel(paper.category)}</span></div>
-            <div className="meta-row"><span className="k">유형</span><span className="v">Original Research</span></div>
+            <div className="meta-row"><span className="k">유형</span><span className="v">{articleTypeLabel(paper.articleType)}</span></div>
             {paper.issueLabel && (
               <div className="meta-row"><span className="k">수록</span><span className="v">{paper.issueLabel}</span></div>
             )}

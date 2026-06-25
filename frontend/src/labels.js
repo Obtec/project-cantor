@@ -64,6 +64,20 @@ export function categoryLabel(c) {
   return c && c.trim() ? c : '미분류';
 }
 
+// 논문 종류 추천 목록(자유 입력 가능)
+export const ARTICLE_TYPES = [
+  '원저 논문',
+  '리뷰 논문',
+  '단신 (Short Communication)',
+  '공부 노트',
+  '에세이',
+  '기타',
+];
+
+export function articleTypeLabel(t) {
+  return t && t.trim() ? t : 'Original Research';
+}
+
 export function year(iso) {
   if (!iso) return new Date().getFullYear();
   try { return new Date(iso).getFullYear(); } catch { return new Date().getFullYear(); }

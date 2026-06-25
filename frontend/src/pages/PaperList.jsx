@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client, { apiError } from '../api/client.js';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { articleCode, longDate, categoryLabel, CATEGORIES } from '../labels.js';
+import { articleCode, longDate, categoryLabel, articleTypeLabel, CATEGORIES } from '../labels.js';
 
 const SIZE = 10;
 
@@ -77,7 +77,7 @@ export default function PaperList() {
             {papers.map((p) => (
               <li key={p.id} className="toc-item">
                 <div className="toc-main">
-                  <div className="eyebrow">{categoryLabel(p.category)}</div>
+                  <div className="eyebrow">{categoryLabel(p.category)} · {articleTypeLabel(p.articleType)}</div>
                   <h3 className="article-title">
                     <Link to={`/papers/${p.id}`}>{p.title}</Link>
                   </h3>

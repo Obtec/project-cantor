@@ -32,9 +32,13 @@ public class Paper {
     @Column(length = 500)
     private String keywords;
 
-    /** 분야(주제 영역). 다학제 저널이므로 수학 외 분야도 허용한다. */
+    /** 분야(주제 영역). 다학제 저널이므로 수학 외 분야도 허용한다. 자유 입력. */
     @Column(length = 100)
     private String category;
+
+    /** 논문 종류. 자유 입력(예: 원저 논문, 리뷰, 공부 노트 등). */
+    @Column(length = 100)
+    private String articleType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

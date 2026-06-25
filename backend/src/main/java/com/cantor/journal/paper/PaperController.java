@@ -177,10 +177,11 @@ public class PaperController {
                                 @RequestParam(required = false) String authorsText,
                                 @RequestParam(required = false) String keywords,
                                 @RequestParam(required = false) String category,
+                                @RequestParam(required = false) String articleType,
                                 @RequestPart("file") MultipartFile file,
                                 @AuthenticationPrincipal UserPrincipal principal) {
         return paperService.response(
-                paperService.submit(principal.getUser(), title, abstractText, authorsText, keywords, category, file));
+                paperService.submit(principal.getUser(), title, abstractText, authorsText, keywords, category, articleType, file));
     }
 
     @PutMapping(path = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -222,7 +223,7 @@ public class PaperController {
     @PreAuthorize("hasRole('EDITOR')")
     public PaperResponse editMetadata(@PathVariable Long id, @RequestBody EditMetadataRequest req) {
         return paperService.response(paperService.editByEditor(
-                id, req.title(), req.authorsText(), req.category(), req.keywords(), req.abstractText()));
+                id, req.title(), req.authorsText(), req.category(), req.articleType(), req.keywords(), req.abstractText()));
     }
 
     @DeleteMapping("/{id}")
