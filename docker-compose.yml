@@ -53,21 +53,34 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN 을 .env 에 설정하세요}
+      NGINX_ENVSUBST_FILTER: DOMAIN   # 템플릿에서 ${DOMAIN} 만 치환($host 등 nginx 변수는 보존)
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/proxy-entrypoint.sh:/proxy-entrypoint.sh:ro
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
+    # 기본 entrypoint(envsubst 처리)는 유지하고, command 로 더미 인증서 보장 + reload 워커를 띄운다.
+    command: ["/bin/sh", "/proxy-entrypoint.sh"]
     depends_on:
       - backend
 
-  # 인증서 자동 갱신 루프. 최초 발급은 nginx/init-letsencrypt.sh 로 수행한다.
+  # 컨테이너 기동 시 자동으로 인증서를 발급하고(최초 1회) 이후 12시간마다 갱신한다.
   certbot:
     image: certbot/certbot
     restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN 을 .env 에 설정하세요}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:?LETSENCRYPT_EMAIL 을 .env 에 설정하세요}
+      STAGING: ${STAGING:-0}
     volumes:
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
-    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done'
+      - ./nginx/certbot-entrypoint.sh:/certbot-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/certbot-entrypoint.sh"]
+    depends_on:
+      - proxy
 
 volumes:
   db_data:
