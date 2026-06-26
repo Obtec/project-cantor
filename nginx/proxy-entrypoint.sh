@@ -17,6 +17,8 @@ write_http_only() {
     cat > "$CONF" <<EOF
 # 로그인 무차별 대입 방지: IP당 분당 5회(+버스트 10)로 제한.
 limit_req_zone \$binary_remote_addr zone=login:10m rate=5r/m;
+# 회원가입 남용 방지: IP당 분당 3회(+버스트 5)로 제한.
+limit_req_zone \$binary_remote_addr zone=register:10m rate=3r/m;
 
 server {
     listen 80;
@@ -52,6 +54,17 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+    location = /api/auth/register {
+        limit_req zone=register burst=5 nodelay;
+        resolver 127.0.0.11 valid=30s;
+        set \$backend http://backend:8080;
+        proxy_pass \$backend;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     location / {
         resolver 127.0.0.11 valid=30s;
         set \$backend http://backend:8080;
@@ -70,6 +83,8 @@ write_full() {
     cat > "$CONF" <<EOF
 # 로그인 무차별 대입 방지: IP당 분당 5회(+버스트 10)로 제한.
 limit_req_zone \$binary_remote_addr zone=login:10m rate=5r/m;
+# 회원가입 남용 방지: IP당 분당 3회(+버스트 5)로 제한.
+limit_req_zone \$binary_remote_addr zone=register:10m rate=3r/m;
 
 server {
     listen 80;
@@ -115,6 +130,17 @@ server {
 
     location = /api/auth/login {
         limit_req zone=login burst=10 nodelay;
+        resolver 127.0.0.11 valid=30s;
+        set \$backend http://backend:8080;
+        proxy_pass \$backend;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location = /api/auth/register {
+        limit_req zone=register burst=5 nodelay;
         resolver 127.0.0.11 valid=30s;
         set \$backend http://backend:8080;
         proxy_pass \$backend;

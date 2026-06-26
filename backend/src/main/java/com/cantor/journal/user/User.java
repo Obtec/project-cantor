@@ -45,6 +45,13 @@ public class User {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    // 로그인 실패 잠금: 연속 실패 횟수와 잠금 해제 시각(분산 무차별 대입 방지).
+    @Column(nullable = false)
+    @Builder.Default
+    private int failedLoginAttempts = 0;
+
+    private Instant lockedUntil;
+
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
