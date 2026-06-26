@@ -22,11 +22,24 @@ server {
     listen 80;
     server_name $DOMAIN;
 
-    location /.well-known/acme-challenge/ {
+    # ^~ : dotfile 차단 정규식(location ~ /\.)보다 우선시켜 ACME 챌린지를 보호한다.
+    location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
     client_max_body_size 50m;
+
+    # 스캐너/봇 차단: dotfile 및 흔한 표적 경로는 404로 끊어 로그 노이즈를 줄인다.
+    # (실제 비밀 파일은 없지만 SPA 폴백이 200을 돌려줘 봇을 끌어들이므로 차단한다.)
+    location ~ /\. {
+        return 404;
+    }
+    location ~* \.(env|sql|bak|old|swp|orig|ini|ya?ml)\$ {
+        return 404;
+    }
+    location ~* ^/(wp-|wordpress|cgi-bin|vendor/|config\.(php|js|json)|configuration\.php|phpinfo|info\.php|web\.config|docker-compose|backup|dump|database|secrets|credentials|settings\.(php|json|ya?ml)|appsettings) {
+        return 404;
+    }
 
     location = /api/auth/login {
         limit_req zone=login burst=10 nodelay;
@@ -62,7 +75,8 @@ server {
     listen 80;
     server_name $DOMAIN;
 
-    location /.well-known/acme-challenge/ {
+    # ^~ : dotfile 차단 정규식(location ~ /\.)보다 우선시켜 ACME 챌린지를 보호한다.
+    location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
@@ -86,6 +100,18 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     client_max_body_size 50m;
+
+    # 스캐너/봇 차단: dotfile 및 흔한 표적 경로는 404로 끊어 로그 노이즈를 줄인다.
+    # (실제 비밀 파일은 없지만 SPA 폴백이 200을 돌려줘 봇을 끌어들이므로 차단한다.)
+    location ~ /\. {
+        return 404;
+    }
+    location ~* \.(env|sql|bak|old|swp|orig|ini|ya?ml)\$ {
+        return 404;
+    }
+    location ~* ^/(wp-|wordpress|cgi-bin|vendor/|config\.(php|js|json)|configuration\.php|phpinfo|info\.php|web\.config|docker-compose|backup|dump|database|secrets|credentials|settings\.(php|json|ya?ml)|appsettings) {
+        return 404;
+    }
 
     location = /api/auth/login {
         limit_req zone=login burst=10 nodelay;
