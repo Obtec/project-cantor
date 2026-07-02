@@ -201,6 +201,10 @@ public class PaperService {
         if (!paper.getSubmitter().getId().equals(actor.getId())) {
             throw ApiException.forbidden("본인이 제출한 논문만 재제출할 수 있습니다.");
         }
+        // 재제출은 편집자가 수정을 요청한 상태에서만 가능하다(게재 논문의 무단 교체 방지).
+        if (paper.getStatus() != PaperStatus.REVISION_REQUESTED) {
+            throw ApiException.badRequest("수정 요청 상태의 논문만 재제출할 수 있습니다.");
+        }
         if (file == null || file.isEmpty()) {
             throw ApiException.badRequest("수정본 PDF를 첨부하세요.");
         }
@@ -259,6 +263,10 @@ public class PaperService {
         Paper paper = get(id);
         if (!paper.getSubmitter().getId().equals(actor.getId())) {
             throw ApiException.forbidden("본인이 제출한 논문만 수정할 수 있습니다.");
+        }
+        // 게재 확정/게재된 논문은 학술 기록 무결성을 위해 저자가 직접 수정할 수 없다.
+        if (paper.getStatus() == PaperStatus.ACCEPTED || paper.getStatus() == PaperStatus.PUBLISHED) {
+            throw ApiException.badRequest("게재 확정되었거나 게재된 논문은 직접 수정할 수 없습니다. 편집장에게 수정 요청을 보내주세요.");
         }
         if (title != null && !title.isBlank()) paper.setTitle(title);
         if (abstractText != null) paper.setAbstractText(abstractText);
@@ -345,42 +353,48 @@ public class PaperService {
         return PaperResponse.from(paper, citationService.citationCount(paper.getId()));
     }
 
-    /** 요청자 기준으로 블라인드 테스트을 적용한 단일 응답. */
+    /** 요청자 기준으로 권한별 응답 가공을 적용한 단일 응답. */
     @Transactional(readOnly = true)
     public PaperResponse response(Paper paper, UserPrincipal principal) {
-        return blindIfNeeded(PaperResponse.from(paper, citationService.citationCount(paper.getId())),
+        return forViewer(PaperResponse.from(paper, citationService.citationCount(paper.getId())),
                 paper, principal);
     }
 
-    /** 목록 응답(피인용수 배치 집계 + 블라인드 테스트). */
+    /** 목록 응답(피인용수 배치 집계 + 권한별 응답 가공). */
     @Transactional(readOnly = true)
     public List<PaperResponse> responses(List<Paper> papers, UserPrincipal principal) {
         List<Long> ids = papers.stream().map(Paper::getId).toList();
         Map<Long, Long> counts = citationService.citationCounts(ids);
         return papers.stream()
-                .map(p -> blindIfNeeded(PaperResponse.from(p, counts.getOrDefault(p.getId(), 0L)), p, principal))
+                .map(p -> forViewer(PaperResponse.from(p, counts.getOrDefault(p.getId(), 0L)), p, principal))
                 .toList();
     }
 
-    /** 블라인드 테스트: 리뷰어(편집자·저자 본인 제외)가 게재 전 논문을 볼 때 저자 정보를 가린다. */
-    private PaperResponse blindIfNeeded(PaperResponse r, Paper p, UserPrincipal principal) {
-        if (!doubleBlind || p.getStatus() == PaperStatus.PUBLISHED || principal == null) {
+    /**
+     * 요청자 권한별 응답 가공. 편집자와 저자 본인은 전체를 보고, 그 외에는
+     * 저자 이메일과 편집 결정 메모를 노출하지 않는다. 리뷰어가 게재 전 논문을
+     * 볼 때는 블라인드 테스트로 저자 정보를 가린다.
+     */
+    private PaperResponse forViewer(PaperResponse r, Paper p, UserPrincipal principal) {
+        Set<Role> roles = principal == null ? Set.of() : principal.getUser().getRoles();
+        boolean editor = roles.contains(Role.EDITOR);
+        boolean owner = principal != null && p.getSubmitter().getId().equals(principal.getId());
+        if (editor || owner) {
             return r;
         }
-        Set<Role> roles = principal.getUser().getRoles();
-        boolean editor = roles.contains(Role.EDITOR);
-        boolean owner = p.getSubmitter().getId().equals(principal.getId());
-        boolean reviewer = roles.contains(Role.REVIEWER);
-        if (reviewer && !editor && !owner) {
-            return new PaperResponse(
-                    r.id(), r.title(), r.abstractText(),
-                    "(블라인드 테스트 — 저자 비공개)", r.keywords(), r.category(), r.articleType(), r.status(),
-                    new UserSummary(null, "익명", ""),
-                    r.fileName(), r.fileSize(), r.decisionNote(), r.citationCount(),
-                    r.articleCode(), r.issueLabel(), r.pages(), r.publishedAt(),
-                    r.createdAt(), r.updatedAt());
-        }
-        return r;
+        boolean blind = doubleBlind && p.getStatus() != PaperStatus.PUBLISHED
+                && roles.contains(Role.REVIEWER);
+        UserSummary submitter = blind
+                ? new UserSummary(null, "익명", "")
+                : new UserSummary(r.submitter().id(), r.submitter().name(), null);
+        return new PaperResponse(
+                r.id(), r.title(), r.abstractText(),
+                blind ? "(블라인드 테스트 — 저자 비공개)" : r.authorsText(),
+                r.keywords(), r.category(), r.articleType(), r.status(),
+                submitter,
+                r.fileName(), r.fileSize(), null, r.citationCount(),
+                r.articleCode(), r.issueLabel(), r.pages(), r.publishedAt(),
+                r.createdAt(), r.updatedAt());
     }
 
     @Transactional

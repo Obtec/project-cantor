@@ -31,7 +31,6 @@ export default function AuthorProfile() {
       <div className="author-head">
         <h2>{data.author.name}</h2>
         {data.affiliation && <div className="muted">{data.affiliation}</div>}
-        <div className="muted small">{data.author.email}</div>
       </div>
 
       <div className="section-head"><h2>Author Metrics</h2></div>
@@ -49,7 +48,7 @@ export default function AuthorProfile() {
         <span className="issue-tag">{data.paperCount}편</span>
       </div>
       {data.papers.length === 0 ? (
-        <p className="muted">제출한 논문이 없습니다.</p>
+        <p className="muted">게재된 논문이 없습니다.</p>
       ) : (
         <ul className="toc">
           {data.papers.map((p) => (
