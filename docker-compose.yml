@@ -40,6 +40,8 @@ services:
       SEED_EDITOR_EMAIL: ${SEED_EDITOR_EMAIL:-editor@cantor.org}
       SEED_EDITOR_PASSWORD: ${SEED_EDITOR_PASSWORD:-editor1234}
       REVIEW_DOUBLE_BLIND: ${REVIEW_DOUBLE_BLIND:-true}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      AI_REVIEW_MODEL: ${AI_REVIEW_MODEL:-gemini-2.5-flash}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@cantor.org}
     volumes:

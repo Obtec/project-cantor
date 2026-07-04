@@ -34,6 +34,10 @@ app:
     upload-dir: ${UPLOAD_DIR:/app/uploads}
   review:
     double-blind: ${REVIEW_DOUBLE_BLIND:true}
+  # AI 피어리뷰 (Gemini). API 키가 비어 있으면 기능이 비활성화된다.
+  ai-review:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${AI_REVIEW_MODEL:gemini-2.5-flash}
   seed:
     editor-email: ${SEED_EDITOR_EMAIL:editor@cantor.org}
     editor-password: ${SEED_EDITOR_PASSWORD:editor1234}

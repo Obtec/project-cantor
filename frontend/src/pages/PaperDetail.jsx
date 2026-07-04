@@ -16,6 +16,8 @@ export default function PaperDetail() {
   const [resubBusy, setResubBusy] = useState(false);
   const [requests, setRequests] = useState([]);
   const [reqForm, setReqForm] = useState({ type: 'EDIT', message: '' });
+  const [aiReviews, setAiReviews] = useState([]);
+  const [aiBusy, setAiBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
 
@@ -44,6 +46,35 @@ export default function PaperDetail() {
         .catch(() => {});
     }
   }, [paper, user, id, hasRole]);
+
+  const loadAiReviews = () => client.get(`/papers/${id}/ai-review`)
+    .then(({ data }) => setAiReviews(data))
+    .catch(() => {});
+
+  useEffect(() => {
+    if (paper && hasRole('EDITOR')) loadAiReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paper?.id, hasRole]);
+
+  // 생성 중(PENDING)인 AI 리뷰가 있으면 완료될 때까지 5초 간격으로 갱신
+  useEffect(() => {
+    if (!aiReviews.some((r) => r.status === 'PENDING')) return undefined;
+    const timer = setInterval(loadAiReviews, 5000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiReviews]);
+
+  const requestAiReview = async () => {
+    setAiBusy(true); setError('');
+    try {
+      await client.post(`/papers/${id}/ai-review`);
+      await loadAiReviews();
+    } catch (err) {
+      setError(apiError(err, 'AI 리뷰 요청에 실패했습니다.'));
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const submitRequest = async (e) => {
     e.preventDefault();
@@ -210,6 +241,61 @@ export default function PaperDetail() {
                   </div>
                 ))
               )}
+            </section>
+          )}
+
+          {hasRole('EDITOR') && (
+            <section className="reviews">
+              <div className="section-head">
+                <h2>AI Peer Review</h2>
+                <button className="btn btn-ghost btn-sm" onClick={requestAiReview}
+                  disabled={aiBusy || aiReviews.some((r) => r.status === 'PENDING')}>
+                  {aiReviews.some((r) => r.status === 'PENDING') ? '생성 중…' : 'AI 리뷰 요청'}
+                </button>
+              </div>
+              <p className="muted small">
+                AI가 생성한 참고용 심사 의견입니다. 편집 결정의 보조 자료로만 활용하세요.
+              </p>
+              {aiReviews.length === 0 && (
+                <p className="muted">아직 생성된 AI 리뷰가 없습니다.</p>
+              )}
+              {aiReviews.map((r) => (
+                <div key={r.id} className="review-card">
+                  <div className="review-head">
+                    <strong>AI 리뷰 {r.model ? `(${r.model})` : ''}</strong>
+                    {r.status === 'PENDING' && <span className="badge status-SUBMITTED">분석 중…</span>}
+                    {r.status === 'FAILED' && <span className="badge status-REJECTED">실패</span>}
+                    {r.status === 'COMPLETED' && r.recommendation && (
+                      <span className="badge">{recommendationLabel(r.recommendation)}</span>
+                    )}
+                    {r.score != null && <span className="muted small">점수 {r.score}/5</span>}
+                    <span className="muted small">{longDate(r.createdAt)}</span>
+                  </div>
+                  {r.status === 'FAILED' && r.errorMessage && (
+                    <p className="muted">{r.errorMessage}</p>
+                  )}
+                  {r.status === 'COMPLETED' && (
+                    <>
+                      {r.summary && <p><strong>요약:</strong> {r.summary}</p>}
+                      {r.strengths?.length > 0 && (
+                        <div>
+                          <strong>강점</strong>
+                          <ul>{r.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                      {r.weaknesses?.length > 0 && (
+                        <div>
+                          <strong>약점</strong>
+                          <ul>{r.weaknesses.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                      {r.commentsToAuthor && (
+                        <p><strong>저자에게:</strong> {r.commentsToAuthor}</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
             </section>
           )}
 
