@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import client, { apiError } from '../api/client.js';
+import { openPdfInNewTab } from '../api/pdf.js';
 import { categoryLabel } from '../labels.js';
 
 const RECS = [
@@ -42,6 +43,12 @@ export default function ReviewSubmit() {
       a.href = url; a.download = paper?.fileName || 'paper.pdf'; a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) { setError(apiError(err, '다운로드에 실패했습니다.')); }
+  };
+
+  const viewPdf = async () => {
+    try {
+      await openPdfInNewTab(`/papers/${assignment.paperId}/file`);
+    } catch (err) { setError(apiError(err, '파일을 여는 데 실패했습니다.')); }
   };
 
   const submit = async (e) => {
@@ -90,7 +97,10 @@ export default function ReviewSubmit() {
             </div>
             {paper.keywords && <p className="muted small"><strong>Keywords:</strong> {paper.keywords}</p>}
             {paper.fileName && (
-              <button className="btn btn-primary" onClick={downloadPdf}>전문 PDF 다운로드</button>
+              <div className="article-actions">
+                <button className="btn btn-primary" onClick={viewPdf}>전문 PDF 보기</button>
+                <button className="btn btn-ghost" onClick={downloadPdf}>전문 PDF 다운로드</button>
+              </div>
             )}
           </>
         )}

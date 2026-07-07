@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import client, { apiError } from '../api/client.js';
+import { openPdfInNewTab } from '../api/pdf.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CitationTree from '../components/CitationTree.jsx';
 import { recommendationLabel, longDate, articleCode, citation, bibtex, categoryLabel, articleTypeLabel } from '../labels.js';
@@ -131,6 +132,22 @@ export default function PaperDetail() {
     }
   };
 
+  const onView = async () => {
+    try {
+      await openPdfInNewTab(`/papers/${id}/file`);
+    } catch (err) {
+      setError(apiError(err, '파일을 여는 데 실패했습니다.'));
+    }
+  };
+
+  const viewVersion = async (versionNo) => {
+    try {
+      await openPdfInNewTab(`/papers/${id}/versions/${versionNo}/file`);
+    } catch (err) {
+      setError(apiError(err, '파일을 여는 데 실패했습니다.'));
+    }
+  };
+
   const copyText = async (text, which) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -208,9 +225,14 @@ export default function PaperDetail() {
 
           <div className="article-actions">
             {paper.fileName && (
-              <button className="btn btn-primary" onClick={onDownload}>
-                전문 PDF 다운로드
-              </button>
+              <>
+                <button className="btn btn-primary" onClick={onView}>
+                  전문 PDF 보기
+                </button>
+                <button className="btn btn-ghost" onClick={onDownload}>
+                  전문 PDF 다운로드
+                </button>
+              </>
             )}
           </div>
 
@@ -312,9 +334,14 @@ export default function PaperDetail() {
                         <div className="muted small">응답서: {v.responseToReviewers}</div>
                       )}
                     </div>
-                    <button className="btn btn-ghost btn-sm" onClick={() => downloadVersion(v.versionNo)}>
-                      PDF
-                    </button>
+                    <div>
+                      <button className="btn btn-ghost btn-sm" onClick={() => viewVersion(v.versionNo)}>
+                        보기
+                      </button>{' '}
+                      <button className="btn btn-ghost btn-sm" onClick={() => downloadVersion(v.versionNo)}>
+                        다운로드
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -400,10 +427,13 @@ export default function PaperDetail() {
           </div>
           {paper.fileName && (
             <div className="aside-card">
-              <h4>Download</h4>
+              <h4>Full Text</h4>
               <div className="meta-row"><span className="k">파일</span><span className="v small">{paper.fileName}</span></div>
-              <button className="btn btn-primary" style={{ width: '100%', marginTop: '0.6rem' }} onClick={onDownload}>
-                PDF
+              <button className="btn btn-primary" style={{ width: '100%', marginTop: '0.6rem' }} onClick={onView}>
+                새 창에서 보기
+              </button>
+              <button className="btn btn-ghost" style={{ width: '100%', marginTop: '0.4rem' }} onClick={onDownload}>
+                다운로드
               </button>
             </div>
           )}
